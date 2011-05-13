@@ -20,5 +20,6 @@ printTask -w 50 "Id : $TR_TORRENT_ID" >> $LOG
 printOk >> $LOG
 
 /home/torrent/transmission-scripts/torrent_ended.py "$TR_TORRENT_NAME" $TR_TORRENT_ID >> $LOG 2>&1
+/home/torrent/transmission-scripts/send_prowl.py "$TR_TORRENT_NAME"
 
 #/home/torrent/scripts/generate_rss.py >> $LOG 2>&1
