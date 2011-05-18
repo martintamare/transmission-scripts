@@ -57,18 +57,20 @@ then
 		
 
 		TV_DATE=`printTask -t`
-		TV_STATUS=`rsync $OPTS $TVDIR $USER@$DEST:$TVDESTDIR 2>&1 | sed '/rsync:.*]/d' | sed 's/ /\n/g' | sed s_tv/.*/__ | sed '/^$/d'`
-		if [ "$TV_STATUS" != "" ]; then
+		TV_STATUS=`rsync $OPTS $TVDIR $USER@$DEST:$TVDESTDIR 2>&1`
+		echo $TV_STATUS >> /home/torrent/log/debug
+		TV_STATUS2= echo $TV_STATUS | sed '/rsync:.*]/d' | sed 's/ /\n/g' | sed s_tv/.*/__ | sed '/^$/d'
+		if [ "$TV_STATUS2" != "" ]; then
 			echo ""
 			echo -n $TV_DATE
 			echo -n " "
 			printTask -w 36 "starting rsync on TV"
 			printWarn
-			echo $TV_STATUS | sed 's/ /\n/g'
+			echo $TV_STATUS2 | sed 's/ /\n/g'
 			printTask -t -w 50 "rsync on TV finished"
 			printOk
 		fi
-		
+
 		MOVIE_DATE=`printTask -t`
 		MOVIE_STATUS=`rsync $OPTS $MOVIEDIR $USER@$DEST:$MOVIEDESTDIR 2>&1 | sed 's/rsync:.*]//' | sed 's/ /\n/g' | sed 's/\(.*[\/]\).*/\1/' | grep "/$"`
 		if [ "$MOVIE_STATUS" != "" ]; then
@@ -81,5 +83,5 @@ then
 			printTask -t -w 50 "rsync on MOVIES finished"
 			printOk
 		fi
-	fi 	
+	fi
 fi

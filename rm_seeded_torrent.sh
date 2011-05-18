@@ -13,7 +13,7 @@ SCRIPTS_DIR="/home/torrent/transmission-scripts/"
 # delete first / last line of output
 # remove leading spaces
 # get first field from each line
-TORRENTLIST=`transmission-remote -n $TR_ADMIN:$TR_PASSWORD -l | sed -e '1d;$d;s/^ *//' | cut -s -d " " -f1`
+TORRENTLIST=`transmission-remote -n $TR_ADMIN:"$TR_PASSWORD" -l | sed -e '1d;$d;s/^ *//' | cut -s -d " " -f1`
 LIMIT_RATIO="120"
 
 # for each torrent in the list
@@ -21,7 +21,7 @@ for TORRENTID in $TORRENTLIST
 do
 	
 	# check the ratio
-	RATIO=`transmission-remote -n $TR_ADMIN:$TR_PASSWORD --torrent $TORRENTID --info  | grep "Ratio:" | cut -s -d ":" -f2`
+	RATIO=`transmission-remote -n $TR_ADMIN:"$TR_PASSWORD" --torrent $TORRENTID --info  | grep "Ratio:" | cut -s -d ":" -f2`
 	# echo $RATIO
 	if [ $RATIO != "None" ]; then
 		# printTask -t -w 50 "Ratio non vide"
@@ -32,16 +32,16 @@ do
 		# echo $INT_RATIO
 		
 		# check torrent’s current state is “Stopped”, “Finished”, or “Idle”
-		STATE_STOPPED=`transmission-remote -n $TR_ADMIN:$TR_PASSWORD --torrent $TORRENTID --info | grep "State: Stopped\|Finished\|Idle"`
+		STATE_STOPPED=`transmission-remote -n $TR_ADMIN:"$TR_PASSWORD" --torrent $TORRENTID --info | grep "State: Stopped\|Finished\|Idle"`
 		# echo $STATE_STOPPED
 
 		# Store torrent's name
-		NAME=`transmission-remote -n $TR_ADMIN:$TR_PASSWORD --torrent $TORRENTID -i | grep "Name:" | cut -s -d ":" -f2`
+		NAME=`transmission-remote -n $TR_ADMIN:"$TR_PASSWORD" --torrent $TORRENTID -i | grep "Name:" | cut -s -d ":" -f2`
 		# printTask -w 50 "${NAME:1:49}"
 		# printOk
 	
 		# Check seeding time
-		SEEDING=`transmission-remote -n $TR_ADMIN:$TR_PASSWORD --torrent $TORRENTID --info | grep "Seeding Time:" | cut -s -d ":" -f2`
+		SEEDING=`transmission-remote -n $TR_ADMIN:"$TR_PASSWORD" --torrent $TORRENTID --info | grep "Seeding Time:" | cut -s -d ":" -f2`
 		PERIOD=`echo $SEEDING | cut -s -d " " -f2`
 		NB_PERIOD=`echo $SEEDING | cut -s -d " " -f1`
 		

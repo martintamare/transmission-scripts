@@ -230,7 +230,7 @@ def generate_rss(dir,name):
 		
 		
 		
-#printInfo("starting RSS generation")
+printInfo("starting RSS generation")
 
 #print('--------------ZIK-------------')
 generate_rss_l1("zik","zik")
@@ -251,4 +251,4 @@ generate_rss_l1("temp","temp")
 generate_rss("/home/torrent/public/tv","Tvshows")
 #generate_rss_l2("/home/torrent/public/tv","tv")
 
-#printOk("RSS generated")
+printOk("RSS generated")
