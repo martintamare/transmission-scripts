@@ -46,6 +46,7 @@ OPTS="-u -L -r --rsh=ssh --exclude-from=$EXCLUDES --log-format=%n"
 
 # May be needed if run by cron?
 export PATH=$PATH:/bin:/usr/bin:/usr/local/bin
+
 PROCESS="rsync"
 pgrep $PROCESS >/dev/null 
 if [ "$?" = "1" ]
@@ -59,7 +60,7 @@ then
 		TV_DATE=`printTask -t`
 		TV_STATUS=`rsync $OPTS $TVDIR $USER@$DEST:$TVDESTDIR 2>&1`
 		echo $TV_STATUS >> /home/torrent/log/debug
-		TV_STATUS2= echo $TV_STATUS | sed '/rsync:.*]/d' | sed 's/ /\n/g' | sed s_tv/.*/__ | sed '/^$/d'
+		TV_STATUS2=`echo $TV_STATUS | sed '/rsync:.*]/d' | sed 's/ /\n/g' | sed s_tv/.*/__ | sed '/^$/d'`
 		if [ "$TV_STATUS2" != "" ]; then
 			echo ""
 			echo -n $TV_DATE

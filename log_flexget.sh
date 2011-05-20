@@ -10,3 +10,4 @@ printTask -t -w 50 "New torrent" >> $LOG
 printWarn >> $LOG
 printTask -w 50 "${1:0:49}" >> $LOG
 printInfo >> $LOG
+echo "" >> $LOG
