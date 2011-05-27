@@ -8,11 +8,17 @@ from stat import *
 from tvnamer.utils import (FileParser,EpisodeInfo)
 from tvdb_api import (tvdb_error, tvdb_shownotfound, tvdb_seasonnotfound,
 tvdb_episodenotfound, tvdb_attributenotfound, tvdb_userabort,Tvdb)
-from my_password import p_tvdb
+from my_password import (p_tvdb,p_mysql)
+import sys
+import getopt
+import sqlite3
 
+# Setup basic directory
 http_dir = 'https://fi08.us.to/'
-dest = "/home/fi08/"
+xml_dir = "/home/fi08/"
+watch_dir = "/home/torrent/public/"
 
+# Setup tvdb using our apikey
 tvdb_instance = Tvdb(apikey=p_tvdb.key)
 
 # useless but i dont know anything equivalent in python ;)
@@ -41,22 +47,199 @@ def format(filename):
 		name = name + i.lower() +"."
 	name = name.rstrip(".")
 	return name
+	# todo, remove double dots...
+
+def generateRSS(debug):
+	if(debug):
+		printInfo("starting Zik RSS generation")
+	generateLevel1("zik","zik",debug)
+
+	if(debug):
+		print("")
+		printInfo("starting App RSS generation")
+	generateLevel1("applications","app",debug)
+
+	if(debug):
+		print("")
+		printInfo("starting Anime RSS generation")
+	generateLevel1("anime","anime",debug)
+
+	if(debug):
+		print("")
+		printInfo("starting Movie RSS generation")
+	generateLevel1("movies","movies",debug)
+
+	if(debug):
+		print("")
+		printInfo("starting Temp RSS generation")
+	generateLevel1("temp","temp",debug)
+
+	if(debug):
+		print("")
+		printInfo("starting TV RSS generation")
+	generateLevel2("tv","Tvshows",debug)
+
+	if(debug):
+		print("")
+
+# Will genarate an rss file in xml, watching files/folder present watch_folder, printing debug info if necessary
+def generateLevel1(watch_folder,xml,debug):
+	#final directory to watch
+	dir = watch_dir+watch_folder
 	
+	#struct that will handle, filename and filedate
+	date_file_list = []
+	
+	#for every file/folder, build a tuple and add it to the list
+	for filename in os.listdir ( dir ):
+		fileStats = os.stat ( dir+"/"+filename )
+		date = time.localtime ( fileStats [ stat.ST_MTIME ])
+		date_file_tuple = date, filename
+		date_file_list.append(date_file_tuple)
+	
+	#sort to have new files first	
+	date_file_list.sort()
+	date_file_list.reverse()
+	
+	if(debug):
+		for item in date_file_list:
+			folder, file_name = os.path.split(item[1])
+			# convert date tuple to MM/DD/YYYY HH:MM:SS format
+			file_date = time.strftime("%m/%d/%y %H:%M:%S", item[0])
+			print(file_date + " " + file_name)
+	else:
+		buildRssLevel1(watch_folder,xml,date_file_list)
+
+def generateLevel2(watch_folder,xml,debug):
+
+	episode_list = []
+	dir = watch_dir+watch_folder
+
+	if(debug):
+		printInfo("Raw data")
+	# First part, parse folder list, to obtain shows information (foldername = showname)
+	for show in os.listdir(dir):
+		showpath = os.path.join(dir, show)
+		mode = os.stat(showpath)[ST_MODE]
+		if S_ISDIR(mode):
+			if(debug):
+				print("Found show " + show)
+			
+			# Second part, part sub folder, have season information (subfolder = s+seasonnumber)
+			for season in os.listdir(showpath):
+				seasonpath = os.path.join(showpath, season)
+				mode = os.stat(showpath)[ST_MODE]
+				if S_ISDIR(mode):
+					if(debug):
+						print("Found season " + season)
+						
+					# Last, build a list with filename , show and filedate
+					for episode in os.listdir(seasonpath):
+						fileStats = os.stat ( seasonpath+"/"+episode )
+						filemode = fileStats[ST_MODE]
+						if S_ISREG(filemode):
+							date = time.localtime ( fileStats [ stat.ST_MTIME ])
+							info = episode, show, date, seasonpath
+							if(debug):
+								print("date : " + time.strftime("%m/%d/%y %H:%M:%S", date) + " " + episode)
+							episode_list.append(info)
+	if(debug):
+		printOk("Raw data")	
+	
+	
+					
+	# check episode_list with the database
+	# database connection
+	conn = sqlite3.connect('/home/torrent/transmission-scripts/rss.db')
+	cursor = conn.cursor()
+	# will hold final info
+	final_list = []
+	
+	for episode in episode_list:
+		filename = episode[0]
+		if(InDatabase(filename,cursor)):
+			# If present to extract data
+			(date,info,path) = FetchInfo(filename,cursor)
+
+		else:
+
+			# Add the row with the good information
+			title = tvnamer(episode[0],episode[1]).generateFilename()
+			correct_date = datetime.date(episode[2].tm_year,episode[2].tm_mon,episode[2].tm_mday)
+			(date,info,path) = (correct_date,title,episode[3].replace("/home/torrent/public/tv/","",1)+"/")
+			
+			if(debug):
+				printInfo(title)
+			else:
+				query = "INSERT into rss_info (filename, date, info, path) values (\"%s\", \"%s\", \"%s\", \"%s\") " %(episode[0],correct_date,title,episode[3])
+				cursor.execute(query)	
+		final_list.append((date,filename,info,path))		
+		
+	#close connection
+	conn.commit()
+	conn.close()
+	
+	#sort to have new files first	
+	final_list.sort()
+	final_list.reverse()
+	
+	if(debug):
+		for item in final_list:
+			filedate = item[0]
+			filename = item[1]
+			info = item[2]
+			path = item[3]
+			# convert date tuple to MM/DD/YYYY HH:MM:SS format
+			print(filedate + " " + filename + " " + info + " " + path)
+	else:
+		# build rss !
+		buildRssLevel2(watch_folder,xml,final_list)
+		
+		
+# Return tuple (date,info,path) from database using filename	
+def FetchInfo(filename,cursor):
+	query = "SELECT date, info, path FROM rss_info WHERE filename =\'" + filename + "\'"
+	cursor.execute(query)
+	row = cursor.fetchone()
+	# remove unecessary path from full path
+	return row[0],row[1],row[2].replace("/home/torrent/public/tv/","",1)+"/"
+
+# Check in a filename is already in database and return boolean
+def InDatabase(filename,cursor):
+	query = "SELECT COUNT(*) FROM rss_info WHERE filename =\'" + filename + "\'"
+	cursor.execute(query)
+	(numrows,)=cursor.fetchone()
+	if(numrows == 0):
+		return False
+	else:
+		return True
 
 # Parse a string to find a tvshow using tvnamer
-# Return a couple (boolean,episode)
-def tvnamer(filename):
+# Return an episode
+def tvnamer(filename,show):
 	try:
 		episode = FileParser(filename).parse()
 	except Exception, e:
-		return(False,"")
+		printError("tvnamer sur " + filename)
+		exit(0)
 	else:
 		if episode.seriesname is None:
-			return(False,episode)
-		else:
-			ep_ok = get_episode_description(episode)
-			return(True,ep_ok)
+			episode.seriesname = show
+			
+		return get_episode_description(episode)
 
+# Return a string containing episode information
+# Format : ShowName - [01x02] - EpisodeName
+def get_episode_description(episode):
+	populateFromTvdb(episode)
+	ep = EpisodeInfo(
+		seriesname = episode.seriesname,
+        seasonnumber = episode.seasonnumber,
+        episodenumbers = episode.episodenumbers,
+		episodename = episode.episodename,
+        filename = None)
+	return ep
+	
 # Ask tvdb the name of the episode
 def populateFromTvdb(episode):
 	try:
@@ -80,175 +263,83 @@ def populateFromTvdb(episode):
 		episode.episodename = epnames
 	return
 
-# Return a string containing episode information
-# Format : ShowName - [01x02] - EpisodeName
-def get_episode_description(episode):
-	populateFromTvdb(episode)
-	ep = EpisodeInfo(
-		seriesname = episode.seriesname,
-        seasonnumber = episode.seasonnumber,
-        episodenumbers = episode.episodenumbers,
-		episodename = episode.episodename,
-        filename = None)
-	return ep
-	
-def build_rss(liste_item,dir,name):
-	# Va contenir la liste des items
-	liste = []
-	
-	#Creation du flux
-	rss = PyRSS2Gen.RSS2(
-	    title = "TV Show Paradize RSS Feed : "+name.capitalize(),
-	    link = "https://fi08.us.to/",
-	    description = "The latest "+name.capitalize()+" of the server",
-	    lastBuildDate = datetime.datetime.now(),
 
+def buildRssLevel1(folder,xml,list):
+	#Creation of the rss
+	rss = PyRSS2Gen.RSS2(
+	    title = "TV Show Paradize RSS Feed : "+folder.capitalize(),
+	    link = "https://fi08.us.to/"+folder,
+	    description = "The latest "+xml.capitalize()+" of the server",
+	    lastBuildDate = datetime.datetime.now(),
 	)
 	
 	#Construction de la liste avec les items
-	for file in liste_item:
-                test = []
-                # extract just the filename
-                folder, file_name = os.path.split(file[1])
-                # convert date tuple to MM/DD/YYYY HH:MM:SS format
-                file_date = time.strftime("%m/%d/%y %H:%M:%S", file[0])
-                #print "%-40s %s" % (file_name, file_date)
-
-                rss.items.append(
-                PyRSS2Gen.RSSItem(
-                        title = file_name.capitalize(),
-                        link = http_dir + dir + "/" + file_name,
-                        description = "",
-                        guid = PyRSS2Gen.Guid(http_dir + dir + "/" + file_name),
-                        pubDate = file_date
-                )
-                )
-	
-	rss.write_xml(open(dest+name+".xml", "w"))
-
-# RSS de profondeur 1
-def generate_rss_l1(ext,name):
-	#repertoire qui va bien
-	dir = "/home/torrent/public/"+ext
-	
-	#structure qui va contenir date et nom de fichier
-	date_file_list = []
-	
-	#pour chaque fichier on regarde la date cree un tuple et on lajoute
-	for filename in os.listdir ( dir ):
-		fileStats = os.stat ( dir+"/"+filename )
-		date = time.localtime ( fileStats [ stat.ST_MTIME ])
-		date_file_tuple = date, filename
-		date_file_list.append(date_file_tuple)
+	for item in list:
 		
-	#on trie par date pour avoir les nouveau en 1er
-	date_file_list.sort()
-	date_file_list.reverse()
-	
-	build_rss(date_file_list,ext,name)
-	
-
-	
-#RSS de profondeur deux !	
-def generate_rss(dir,name):
-	
-	#Creation du flux
-	rss = PyRSS2Gen.RSS2(
-	    title = "TV Show Paradize RSS Feed : "+name.capitalize(),
-	    link = "https://fi08.us.to/",
-	    description = "The latest "+name.capitalize()+" of the server",
-	    lastBuildDate = datetime.datetime.now(),
-
-	)
-	
-	#structure qui va contenir date et nom de fichier et rep
-	date_file_list = []
-	
-	for f in os.listdir(dir):
-		pathname = os.path.join(dir, f)
-		mode = os.stat(pathname)[ST_MODE]
-		fileStats = os.stat ( pathname )
-		if S_ISDIR(mode):
-			# It's a directory, build rss from the file
-			
-			for h in os.listdir(pathname):
-				subpathname = os.path.join(pathname, h)
-				fileStats = os.stat ( subpathname)
-				submode = fileStats[ST_MODE]
-				if S_ISDIR(submode):
-					for files in os.listdir(subpathname):
-						fileStats = os.stat ( subpathname+"/"+files )
-						filemode = fileStats[ST_MODE]
-						if S_ISREG(filemode):
-							# On ajoute le tuple, date nom du chier
-							# print "on ajoute fichier " + files
-							date = time.localtime ( fileStats [ stat.ST_MTIME ])
-							date_file_tuple = date, f + "/" + h + "/" + files, ""
-							date_file_list.append(date_file_tuple)
-					
-		elif S_ISREG(mode):
-			# On ajoute le tuple, date nom du chier
-			#print "on ajoute fichier "
-			date = time.localtime ( fileStats [ stat.ST_MTIME ])
-			date_file_tuple = date, f, ""
-			date_file_list.append(date_file_tuple)
-			
-	#on trie par date pour avoir les nouveau en 1er
-	date_file_list.sort()
-	date_file_list.reverse()
-
-	#Construction de la liste avec les items
-	for g in date_file_list:
 		# extract just the filename
-		folder, file_name = os.path.split(g[1])
-		
-		# print "folder:"+folder+" file:"+file_name
+		folder, file_name = os.path.split(item[1])
 		# convert date tuple to MM/DD/YYYY HH:MM:SS format
-		file_date = time.strftime("%m/%d/%y %H:%M:%S", g[0])
-		#print "%-40s %s" % (file_name, file_date)
+		file_date = time.strftime("%m/%d/%y %H:%M:%S", item[0])
 		
-		# Get right info
-		# print "On traite %s" % (file_name)
-		is_tv = tvnamer(file_name)
-		title = ""
-		# If only one file
-		if is_tv[0]:
-			episode = is_tv[1]
-			title = episode.generateFilename()
-			# print ": %s" % (title)
-		
-		# print(file_date)
 		rss.items.append(
-                PyRSS2Gen.RSSItem(
-                        title = title,
-                        link = http_dir + "tv/" + folder + "/"+file_name,
-                        guid = PyRSS2Gen.Guid(http_dir + "tv/" + folder + "/"+file_name),
-                        pubDate = file_date)
-						)
+			PyRSS2Gen.RSSItem(
+				title = file_name.capitalize(),
+				link = http_dir + folder + "/" + file_name,
+				description = "",
+				guid = PyRSS2Gen.Guid(http_dir + folder + "/" + file_name),
+				pubDate = file_date
+			)
+		)
 	
-	rss.write_xml(open(dest+name.lower()+".xml", "w"))	
+	rss.write_xml(open(xml_dir+xml+".xml", "w"))
+
+def buildRssLevel2(folder,xml,list):
+	#Creation of the rss
+	rss = PyRSS2Gen.RSS2(
+	    title = "TV Show Paradize RSS Feed : "+folder.capitalize(),
+	    link = "https://fi08.us.to/"+folder,
+	    description = "The latest "+xml.capitalize()+" of the server",
+	    lastBuildDate = datetime.datetime.now(),
+	)
+	
+	#Creating item
+	for item in list:
+		filedate = item[0]
+		filename = item[1]
+		info = item[2]
+		path = item[3]
 		
-		
-		
-printInfo("starting RSS generation")
+		rss.items.append(
+			PyRSS2Gen.RSSItem(
+				title = info,
+				link = http_dir + folder + "/" + path + filename,
+				description = info,
+				guid = PyRSS2Gen.Guid(http_dir + folder + "/" + path + filename),
+				pubDate = filedate
+			)
+		)
+	# Write !
+	rss.write_xml(open(xml_dir+xml+".xml", "w"))
+	
+def usage():											
+	print "Only the option -d or --debug is available to print debug info"
 
-#print('--------------ZIK-------------')
-generate_rss_l1("zik","zik")
-
-#print('--------------ZIK-------------')
-generate_rss_l1("applications","app")
-
-#print('--------------ANIME-------------')
-generate_rss_l1("anime","anime")
-
-#print('--------------MOVIE-------------')
-generate_rss_l1("movies","movies")
-
-#print('--------------TEMP-------------')
-generate_rss_l1("temp","temp")
-
-#print('--------------TV-------------')
-generate_rss("/home/torrent/public/tv","Tvshows")
-#generate_rss_l2("/home/torrent/public/tv","tv")
-
-printOk("RSS generated")
+# Test to do thing the right way using getpot !
+# So far, only one parameter, debug
+def main():
+	try:
+		opts, args = getopt.getopt(sys.argv[1:], "d", ["debug"])
+	except getopt.GetoptError, err:
+		# print help information and exit:
+		print str(err) # will print something like "option -a not recognized"
+		usage()
+		sys.exit(2)
+	debug = False
+	for o, a in opts:
+		if o in ("-d", "--debug"):
+			printInfo ("Debug mode ON")
+			debug = True
+	generateRSS(debug)
+	
+if __name__ == "__main__":
+	main()
