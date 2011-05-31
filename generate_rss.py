@@ -77,7 +77,7 @@ def generateRSS(debug):
 	if(debug):
 		print("")
 		printInfo("starting TV RSS generation")
-	generateLevel2("tv","Tvshows",debug)
+	generateLevel2("tv","tvshows",debug)
 
 	if(debug):
 		print("")
@@ -154,22 +154,26 @@ def generateLevel2(watch_folder,xml,debug):
 	cursor = conn.cursor()
 	# will hold final info
 	final_list = []
-	
+	if(debug):
+		printInfo("Unsorted Data")
+		
 	for episode in episode_list:
 		filename = episode[0]
 		if(InDatabase(filename,cursor)):
 			# If present to extract data
 			(date,info,path) = FetchInfo(filename,cursor)
-
+			if(debug):
+				printInfo("database: " + info)
 		else:
 
 			# Add the row with the good information
 			title = tvnamer(episode[0],episode[1]).generateFilename()
 			correct_date = datetime.date(episode[2].tm_year,episode[2].tm_mon,episode[2].tm_mday)
 			(date,info,path) = (correct_date,title,episode[3].replace("/home/torrent/public/tv/","",1)+"/")
+			correct_date = correct_date.__str__()
 			
 			if(debug):
-				printInfo(title)
+				printInfo("tvdb: "+title)
 			else:
 				query = "INSERT into rss_info (filename, date, info, path) values (\"%s\", \"%s\", \"%s\", \"%s\") " %(episode[0],correct_date,title,episode[3])
 				cursor.execute(query)	
@@ -179,10 +183,15 @@ def generateLevel2(watch_folder,xml,debug):
 	conn.commit()
 	conn.close()
 	
+	if(debug):
+		printOk("Unsorted Data")
+		
 	#sort to have new files first	
 	final_list.sort()
 	final_list.reverse()
 	
+	if(debug):
+		printInfo("Sorted Data")
 	if(debug):
 		for item in final_list:
 			filedate = item[0]
@@ -190,11 +199,14 @@ def generateLevel2(watch_folder,xml,debug):
 			info = item[2]
 			path = item[3]
 			# convert date tuple to MM/DD/YYYY HH:MM:SS format
-			print(filedate + " " + filename + " " + info + " " + path)
+			# print(filedate + " " + filename + " " + info + " " + path)
+			printInfo(filedate + " " + info)
 	else:
 		# build rss !
 		buildRssLevel2(watch_folder,xml,final_list)
-		
+	
+	if(debug):
+		printOk("Sorted Data")	
 		
 # Return tuple (date,info,path) from database using filename	
 def FetchInfo(filename,cursor):
