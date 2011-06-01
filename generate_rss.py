@@ -177,22 +177,17 @@ def generateLevel2(watch_folder,xml,debug):
 			else:
 				query = "INSERT into rss_info (filename, date, info, path) values (\"%s\", \"%s\", \"%s\", \"%s\") " %(episode[0],correct_date,title,episode[3])
 				cursor.execute(query)	
-		final_list.append((date,filename,info,path))		
+		final_list.append((date,filename,info,path,True))		
 		
-	#close connection
-	conn.commit()
-	conn.close()
-	
 	if(debug):
-		printOk("Unsorted Data")
+		printOk("Unsorted data")
 		
 	#sort to have new files first	
 	final_list.sort()
 	final_list.reverse()
 	
 	if(debug):
-		printInfo("Sorted Data")
-	if(debug):
+		printInfo("Sorted data")
 		for item in final_list:
 			filedate = item[0]
 			filename = item[1]
@@ -206,8 +201,19 @@ def generateLevel2(watch_folder,xml,debug):
 		buildRssLevel2(watch_folder,xml,final_list)
 	
 	if(debug):
-		printOk("Sorted Data")	
-		
+		printOk("Sorted data")	
+		printInfo("Remove old data")
+	
+	# use the list to remove old data
+	RemoveOldData(final_list,cursor,debug)
+	
+	if(debug):
+		printOk("Remove old data")	
+	
+	#close connection
+	conn.commit()
+	conn.close()
+	
 # Return tuple (date,info,path) from database using filename	
 def FetchInfo(filename,cursor):
 	query = "SELECT date, info, path FROM rss_info WHERE filename =\'" + filename + "\'"
@@ -226,6 +232,39 @@ def InDatabase(filename,cursor):
 	else:
 		return True
 
+# Remove old entries from the tv database
+def RemoveOldData(list,cursor,debug):
+	# Will contain the list to be remove
+	remove_list = []
+	# Will contain all data from database
+	data_list = []
+	query = "SELECT filename FROM rss_info"
+	cursor.execute(query)
+	for row in cursor:
+		data_list.append(row[0])
+		
+	# Will contain ok data from list
+	ok_list = []
+	for item in list:
+		ok_list.append(item[1])
+	
+	# Now loop data_list
+	for item in data_list:
+		# if cannot be find in ok_list
+		try:
+			ok_list.index(item)
+		except Exception, e:
+			# add to remove list
+			remove_list.append(item)
+	
+	# loop remove list and perform queries
+	for item in remove_list:
+		if(debug):
+			print "Removing " + item
+		else:
+			# notice the trick, to convert item as a tuple
+			cursor.execute("delete from rss_info where filename=?",(item,))
+	
 # Parse a string to find a tvshow using tvnamer
 # Return an episode
 def tvnamer(filename,show):
