@@ -4,3 +4,7 @@ Collection of various scripts I used to extend transmission :
 - remove torrent with correct seeding ratio
 - generate rss files
 - ...
+
+TODO :
+
+- handle syslog !
