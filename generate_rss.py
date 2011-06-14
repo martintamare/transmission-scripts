@@ -163,19 +163,19 @@ def generateLevel2(watch_folder,xml,debug):
 			# If present to extract data
 			(date,info,path) = FetchInfo(filename,cursor)
 			if(debug):
-				printInfo("database: " + info)
+				printInfo("database: " + date + " " + info)
 		else:
 
 			# Add the row with the good information
 			title = tvnamer(episode[0],episode[1]).generateFilename()
 			correct_date = datetime.date(episode[2].tm_year,episode[2].tm_mon,episode[2].tm_mday)
 			(date,info,path) = (correct_date,title,episode[3].replace("/home/torrent/public/tv/","",1)+"/")
-			correct_date = correct_date.__str__()
+			date = correct_date.__str__()
 			
 			if(debug):
-				printInfo("tvdb: "+title)
+				printInfo("tvdb: "+ date + " " + title)
 			else:
-				query = "INSERT into rss_info (filename, date, info, path) values (\"%s\", \"%s\", \"%s\", \"%s\") " %(episode[0],correct_date,title,episode[3])
+				query = "INSERT into rss_info (filename, date, info, path) values (\"%s\", \"%s\", \"%s\", \"%s\") " %(episode[0],date,title,episode[3])
 				cursor.execute(query)	
 		final_list.append((date,filename,info,path,True))		
 		
