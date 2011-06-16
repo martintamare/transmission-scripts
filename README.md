@@ -10,16 +10,41 @@ Change log to handle syslog. The local0 file is used !
 Description of the scripts:
 ---------------------------
 
-*
-	create_db.py
+
+- create_db.py
 	small python script to create local database to store tv shows information (avoiding over-asking tvdb database)
-* 
 
-- sort torrent and create symlink for seeding ratio
-- remove torrent with correct seeding ratio
-- generate rss files
-- ...
+- finish.sh
+	called by transmission when a torrent has finish downloading. It starts other scripts
 
-TODO :
+- generate_rss.py
+	does what the name is saying ;) Using a local sqlite database to store tv show information (name of the episode)
 
-- handle syslog !
+- log_flexget.sh
+	very simple script to log flexget downloads
+
+- rm_seeded_torrent.sh
+	script called every hour : check ratio of seeding torrent and remove torrent with a sufficient ratio.
+
+- rm_torrent.sh
+	simple script to remove a torrent in transmission using his id
+
+- send_prowl.py
+	simple python script to send notification to prowl (growl like system for phone notification)
+
+- synchro.sh
+	rsync script to copy data of my local server at home
+
+- tool_renamer.sh
+	I always forget how to batch rename file using bash. This tool makes my life easier
+
+- torrent_ended.py
+	when a torrent is finished : checks if it's a tv show or not.
+	If yes : creates a symlink (to be able to seed) to a sorted directory (tv/tvshowname/seasonnumber/file)
+	If no : move to a private section where I will manually (:() move it
+
+- torrent_sended.py
+	removes the symlink previously created
+
+- update_blocklist.sh
+	script called once a week to update blocklist
