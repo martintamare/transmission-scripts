@@ -7,10 +7,12 @@ Last update:
 ------------
 Change log to handle syslog. The local0 file is used !
 
+To do:
+------------
+test syslog and improves rsync log (duplicates & stuff)
+
 Description of the scripts:
 ---------------------------
-
-
 **create_db.py** - small python script to create local database to store tv shows information (avoiding over-asking tvdb database)
 
 **finish.sh** - called by transmission when a torrent has finish downloading. It starts other scripts
