@@ -1,13 +1,8 @@
 #!/bin/sh
 
-LOG_DIR="/home/torrent/log/"
-LOG=$LOG_DIR"flexget"
+LOG_FILE="local0.info"
+LOG_APP="flexget"
+SCRIPT_PATH="/home/torrent/transmission-scripts/"
 
-# To do beauty !
-. /home/torrent/transmission-scripts/bash-beauty.sh
-
-printTask -t -w 50 "New torrent" >> $LOG
-printWarn >> $LOG
-printTask -w 50 "${1:0:49}" >> $LOG
-printInfo >> $LOG
-echo "" >> $LOG
+# log using syslog
+logger -p $LOG_FILE -t $LOG_APP "new torrent: " "$1"

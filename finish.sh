@@ -1,25 +1,17 @@
 #!/bin/bash
 
-LOG="/home/torrent/log/finish"
+LOG_FILE="local0.info"
+LOG_APP="finish.sh"
+SCRIPT_PATH="/home/torrent/transmission-scripts/"
 
-. /home/torrent/transmission-scripts/bash-beauty.sh
+# log using syslog
+logger -p $LOG_FILE -t $LOG_APP "New finished torrent, id=$TR_TORRENT_ID name=" "$TR_TORRENT_NAME" 
 
-# Skip first line
-echo "" >> $LOG
-printTask -t -w 50 "New finished torrent" >> $LOG
-printWarn >> $LOG
+# calling python script to sort file
+"$SCRIPT_PATH"torrent_ended.py "$TR_TORRENT_NAME" $TR_TORRENT_ID
 
-printTask -t -w 50 "Raw data" >> $LOG
-printInfo >> $LOG
-#echo "$TR_APP_VERSION $TR_TIME_LOCALTIME $TR_TORRENT_DIR $TR_TORRENT_HASH $TR_TORRENT_ID $TR_TORRENT_NAME" >> $LOG
+# sending a prowl notification
+"$SCRIPT_PATH"send_prowl.py "$TR_TORRENT_NAME"
 
-printTask -w 50 "${TR_TORRENT_NAME:0:49}" >> $LOG
-printOk >> $LOG
-
-printTask -w 50 "Id : $TR_TORRENT_ID" >> $LOG
-printOk >> $LOG
-
-/home/torrent/transmission-scripts/torrent_ended.py "$TR_TORRENT_NAME" $TR_TORRENT_ID >> $LOG 2>&1
-/home/torrent/transmission-scripts/send_prowl.py "$TR_TORRENT_NAME"
-
-#/home/torrent/scripts/generate_rss.py >> $LOG 2>&1
+# generate rss
+"$SCRIPT_PATH"generate_rss.py

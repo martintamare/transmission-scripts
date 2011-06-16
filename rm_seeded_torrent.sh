@@ -1,9 +1,7 @@
 #!/bin/sh
-
-SCRIPTS_DIR="/home/torrent/transmission-scripts/"
-
-# To do beauty !
-. /home/torrent/transmission-scripts/bash-beauty.sh
+LOG_FILE="local0.info"
+LOG_APP="rm_seeded_torrent"
+SCRIPT_PATH="/home/torrent/transmission-scripts/"
 
 # file where TR_ADMIN, TR_PASSWORD are stored
 . /home/torrent/transmission-scripts/my_password.sh
@@ -53,20 +51,10 @@ do
 		if [ $INT_RATIO -ge $LIMIT_RATIO ] && [ "$STATE_STOPPED" != "" ]; then
 			echo ""
 
-			printTask -t -w 50 "torrent id $TORRENTID finished"
-			printWarn
-		
-			printTask -w 50 "${NAME:1:49}"
-			printInfo
+			logger -p $LOG_FILE -t $LOG_APP "removing torrent $TORRENTID, name=${NAME:1}, ratio=$RATIO"
 			
-			printTask -w 50 "Ratio : $RATIO"
-			printInfo
-		
 			# move the files and remove the torrent from Transmission
 			/home/torrent/transmission-scripts/torrent_seeded.py "${NAME:1}"
-	
-			#printTask -t -w 50 "deleting torrent"
-			#printInfo
 			/home/torrent/transmission-scripts/rm_torrent.sh $TORRENTID
 			
 		#If torrent has been seeded for a week, remove it !

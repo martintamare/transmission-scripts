@@ -12,6 +12,10 @@ from my_password import (p_tvdb,p_mysql)
 import sys
 import getopt
 import sqlite3
+import syslog
+
+# specify our log file, here local0 !
+syslog.openlog('rss', 0, syslog.LOG_LOCAL0)
 
 # Setup basic directory
 http_dir = 'https://fi08.us.to/'
@@ -20,20 +24,6 @@ watch_dir = "/home/torrent/public/"
 
 # Setup tvdb using our apikey
 tvdb_instance = Tvdb(apikey=p_tvdb.key)
-
-# useless but i dont know anything equivalent in python ;)
-beauty_path = "/home/torrent/transmission-scripts/bash-beauty.sh"
-def printOk(text):
-	os.system(". "+beauty_path+"; printTask -t -w 50 \""+text+"\";printOk")
-
-def printFail(text,error):
-	os.system(". "+beauty_path+"; printTask -t -w 50 \""+text+"\";printFail \"" + error + "\"" )
-
-def printWarn(text):
-	os.system(". "+beauty_path+"; printTask -t -w 50 \""+text+"\";printWarn")
-	
-def printInfo(text):
-	os.system(". "+beauty_path+"; printTask -t -w 50 \""+text+"\";printInfo")
 	
 # Format filename : lowercase and remove spaces " " with dots "."
 def format(filename):
@@ -51,36 +41,29 @@ def format(filename):
 
 def generateRSS(debug):
 	if(debug):
-		printInfo("starting Zik RSS generation")
+		syslog.syslog(syslog.LOG_DEBUG,"starting Zik RSS generation")
 	generateLevel1("zik","zik",debug)
 
 	if(debug):
-		print("")
-		printInfo("starting App RSS generation")
+		syslog.syslog(syslog.LOG_DEBUG,"starting App RSS generation")
 	generateLevel1("applications","app",debug)
 
 	if(debug):
-		print("")
-		printInfo("starting Anime RSS generation")
+		syslog.syslog(syslog.LOG_DEBUG,"starting Anime RSS generation")
 	generateLevel1("anime","anime",debug)
 
 	if(debug):
-		print("")
-		printInfo("starting Movie RSS generation")
+		syslog.syslog(syslog.LOG_DEBUG,"starting Movies RSS generation")
 	generateLevel1("movies","movies",debug)
 
 	if(debug):
-		print("")
-		printInfo("starting Temp RSS generation")
+		syslog.syslog(syslog.LOG_DEBUG,"starting Temp RSS generation")
 	generateLevel1("temp","temp",debug)
 
 	if(debug):
-		print("")
-		printInfo("starting TV RSS generation")
+		syslog.syslog(syslog.LOG_DEBUG,"starting TV RSS generation")
 	generateLevel2("tv","tvshows",debug)
 
-	if(debug):
-		print("")
 
 # Will genarate an rss file in xml, watching files/folder present watch_folder, printing debug info if necessary
 def generateLevel1(watch_folder,xml,debug):
@@ -106,7 +89,7 @@ def generateLevel1(watch_folder,xml,debug):
 			folder, file_name = os.path.split(item[1])
 			# convert date tuple to MM/DD/YYYY HH:MM:SS format
 			file_date = time.strftime("%m/%d/%y %H:%M:%S", item[0])
-			print(file_date + " " + file_name)
+			syslog.syslog(syslog.LOG_DEBUG, file_date + " " + file_name)
 	else:
 		buildRssLevel1(watch_folder,xml,date_file_list)
 
@@ -116,14 +99,14 @@ def generateLevel2(watch_folder,xml,debug):
 	dir = watch_dir+watch_folder
 
 	if(debug):
-		printInfo("Raw data")
+		syslog.syslog(syslog.LOG_DEBUG,"Raw data")
 	# First part, parse folder list, to obtain shows information (foldername = showname)
 	for show in os.listdir(dir):
 		showpath = os.path.join(dir, show)
 		mode = os.stat(showpath)[ST_MODE]
 		if S_ISDIR(mode):
 			if(debug):
-				print("Found show " + show)
+				syslog.syslog(syslog.LOG_DEBUG,"Found show " + show)
 			
 			# Second part, part sub folder, have season information (subfolder = s+seasonnumber)
 			for season in os.listdir(showpath):
@@ -131,7 +114,7 @@ def generateLevel2(watch_folder,xml,debug):
 				mode = os.stat(showpath)[ST_MODE]
 				if S_ISDIR(mode):
 					if(debug):
-						print("Found season " + season)
+						syslog.syslog(syslog.LOG_DEBUG,"Found season " + season)
 						
 					# Last, build a list with filename , show and filedate
 					for episode in os.listdir(seasonpath):
@@ -141,10 +124,10 @@ def generateLevel2(watch_folder,xml,debug):
 							date = time.localtime ( fileStats [ stat.ST_MTIME ])
 							info = episode, show, date, seasonpath
 							if(debug):
-								print("date : " + time.strftime("%m/%d/%y %H:%M:%S", date) + " " + episode)
+								syslog.syslog(syslog.LOG_DEBUG,"date : " + time.strftime("%m/%d/%y %H:%M:%S", date) + " " + episode)
 							episode_list.append(info)
 	if(debug):
-		printOk("Raw data")	
+		syslog.syslog(syslog.LOG_DEBUG,"Raw data")	
 	
 	
 					
@@ -155,7 +138,7 @@ def generateLevel2(watch_folder,xml,debug):
 	# will hold final info
 	final_list = []
 	if(debug):
-		printInfo("Unsorted Data")
+		syslog.syslog(syslog.LOG_DEBUG,"Unsorted Data")
 		
 	for episode in episode_list:
 		filename = episode[0]
@@ -163,7 +146,7 @@ def generateLevel2(watch_folder,xml,debug):
 			# If present to extract data
 			(date,info,path) = FetchInfo(filename,cursor)
 			if(debug):
-				printInfo("database: " + date + " " + info)
+				syslog.syslog(syslog.LOG_DEBUG,"database: " + date + " " + info)
 		else:
 
 			# Add the row with the good information
@@ -173,21 +156,21 @@ def generateLevel2(watch_folder,xml,debug):
 			date = correct_date.__str__()
 			
 			if(debug):
-				printInfo("tvdb: "+ date + " " + title)
+				syslog.syslog(syslog.LOG_DEBUG,"tvdb: "+ date + " " + title)
 			else:
 				query = "INSERT into rss_info (filename, date, info, path) values (\"%s\", \"%s\", \"%s\", \"%s\") " %(episode[0],date,title,episode[3])
 				cursor.execute(query)	
 		final_list.append((date,filename,info,path,True))		
 		
 	if(debug):
-		printOk("Unsorted data")
+		syslog.syslog(syslog.LOG_DEBUG,"Unsorted data")
 		
 	#sort to have new files first	
 	final_list.sort()
 	final_list.reverse()
 	
 	if(debug):
-		printInfo("Sorted data")
+		syslog.syslog(syslog.LOG_DEBUG,"Sorted data")
 		for item in final_list:
 			filedate = item[0]
 			filename = item[1]
@@ -195,20 +178,20 @@ def generateLevel2(watch_folder,xml,debug):
 			path = item[3]
 			# convert date tuple to MM/DD/YYYY HH:MM:SS format
 			# print(filedate + " " + filename + " " + info + " " + path)
-			printInfo(filedate + " " + info)
+			syslog.syslog(syslog.LOG_DEBUG,filedate + " " + info)
 	else:
 		# build rss !
 		buildRssLevel2(watch_folder,xml,final_list)
 	
 	if(debug):
-		printOk("Sorted data")	
-		printInfo("Remove old data")
+		syslog.syslog(syslog.LOG_DEBUG,"Sorted data")	
+		syslog.syslog(syslog.LOG_DEBUG,"Remove old data")
 	
 	# use the list to remove old data
 	RemoveOldData(final_list,cursor,debug)
 	
 	if(debug):
-		printOk("Remove old data")	
+		syslog.syslog(syslog.LOG_DEBUG,"Remove old data")	
 	
 	#close connection
 	conn.commit()
@@ -260,7 +243,7 @@ def RemoveOldData(list,cursor,debug):
 	# loop remove list and perform queries
 	for item in remove_list:
 		if(debug):
-			print "Removing " + item
+			syslog.syslog(syslog.LOG_DEBUG,"Removing " + item)
 		else:
 			# notice the trick, to convert item as a tuple
 			cursor.execute("delete from rss_info where filename=?",(item,))
@@ -271,7 +254,7 @@ def tvnamer(filename,show):
 	try:
 		episode = FileParser(filename).parse()
 	except Exception, e:
-		printError("tvnamer sur " + filename)
+		syslog.syslog(syslog.LOG_ERR,"tvnamer sur " + filename)
 		exit(0)
 	else:
 		if episode.seriesname is None:
@@ -296,7 +279,7 @@ def populateFromTvdb(episode):
 	try:
 		show = tvdb_instance[episode.seriesname]
 	except Exception, e:
-		printFail("tvdb_instance",str(e) + " " + episode.filename)
+		syslog.syslog(syslog.LOG_ERR,"tvdb_instance",str(e) + " " + episode.filename)
 		return
 	else:	
 		episode.seriesname = show['seriesname']
@@ -388,7 +371,6 @@ def main():
 	debug = False
 	for o, a in opts:
 		if o in ("-d", "--debug"):
-			printInfo ("Debug mode ON")
 			debug = True
 	generateRSS(debug)
 	

@@ -2,30 +2,23 @@
 
 import re,os,stat,shutil,string,sys,twitter,tinyurl
 from tvnamer.utils import (FileParser,EpisodeInfo)
-from tvdb_api import (tvdb_error, tvdb_shownotfound, tvdb_seasonnotfound,
-tvdb_episodenotfound, tvdb_attributenotfound, tvdb_userabort,Tvdb)
+from tvdb_api import (tvdb_error, tvdb_shownotfound, tvdb_seasonnotfound, tvdb_episodenotfound, tvdb_attributenotfound, tvdb_userabort,Tvdb)
 from my_password import (p_tvdb, p_twitter)
+import syslog
 
+# instance
 tvdb_instance = Tvdb(apikey=p_tvdb.key)
 
+# specify our log file, here local0 !
+syslog.openlog('torrent_ended.py', 0, syslog.LOG_LOCAL0)
+
+# different path
 file_source="/home/torrent/downloads/completed/"
 torrent_source="/var/lib/transmission-daemon/info/torrents/"
 tv_dest="/home/torrent/public/tv/"
 other_dest="/home/torrent/private/"
 http_base="https://fi08.us.to/"
 script_path="/home/torrent/transmission-scripts/"
-
-def printOk(text):
-	os.system(". "+script_path+"bash-beauty.sh; printTask -t -w 50 \""+text+"\";printOk")
-
-def printFail(text,error):
-	os.system(". "+script_path+"bash-beauty.sh; printTask -t -w 50 \""+text+"\";printFail \"" + error + "\"" )
-
-def printWarn(text):
-	os.system(". "+script_path+"bash-beauty.sh; printTask -t -w 50 \""+text+"\";printWarn")
-	
-def printInfo(text):
-	os.system(". "+script_path+"bash-beauty.sh; printTask -t -w 50 \""+text+"\";printInfo")
 
 # Format filename : lowercase and remove spaces " " with dots "."
 def format(filename):
@@ -40,7 +33,6 @@ def format(filename):
 	name = name.rstrip(".")
 	return name
 	
-
 # Parse a string to find a tvshow using tvnamer
 # Return a couple (boolean,episode)
 def tvnamer(filename):
@@ -126,43 +118,40 @@ def sort(filename,id):
 				try:
 					os.mkdir(base_home_dir)
 				except Exception, e:
-					printFail("created subdirectory" , "os.mkdir failed on " + base_home_dir + ". Error: " + e.strerror)
+					syslog.syslog(syslog.LOG_ERR,"os.mkdir failed on " + base_home_dir + ". Error: " + e.strerror)
 				else:
-					printWarn("created subdirectory " + dest_folder)
+					syslog.syslog(syslog.LOG_INFO,"created subdirectory " + dest_folder)
 				
 			if(not(os.path.isdir(home_dir))):
 				try:
 					os.mkdir(home_dir)
 				except Exception, e:
-					printFail("created subdirectory" , "os.mkdir failed on " + home_dir + ". Error: " + e.strerror)
+					syslog.syslog(syslog.LOG_ERR,"os.mkdir failed on " + home_dir + ". Error: " + e.strerror)
 				else:
-					printWarn("created subdirectory s" + str(season))
+					syslog.syslog(syslog.LOG_INFO,"created subdirectory s" + str(season))
 					
 			try:
 				os.symlink(file_source+filename,home_dir+"/"+formatted_filename)
 			except Exception, e:
-				printFail("created symlink", "os.symlink failed on " + home_dir + "/"+formatted_filename + ". Error: " + e.strerror)
-			#else:
-				#printOk("created symlink")
-				
+				syslog.syslog(syslog.LOG_ERR,"os.symlink failed on " + home_dir + "/"+formatted_filename + ". Error: " + e.strerror)
+			
+			# build the http for twitter status	
 			http_dir = "tv/" + dest_folder +"/s" + str(season) + "/" + formatted_filename
 			
 			# Create status
 			status = get_episode_description(episode)
 			return(True,status,http_dir)
 		else:
-			printFail("tv without season" , filename)
+			syslog.syslog(syslog.LOG_ERR,"tv without season" , filename)
+
 	# else: if we did not return yet
 	# Rename file or folder and then remove associated torrent	
 	#printInfo("not TV, moving to temp zone")
 	try:
 		os.rename(file_source+filename,other_dest+formatted_filename)
 	except Exception, e:
-		printFail("moving : " + formatted_filename, "os.rename error:" + e.strerror)
-	#else:
-		#printOk("moving : " + formatted_filename)
+		syslog.syslog(syslog.LOG_ERR,"moving : " + formatted_filename + " os.rename error: " + e.strerror)
 		
-	#printInfo("deleting torrent")
 	os.system(script_path+"rm_torrent.sh "+id);
 	return(False,status,http_dir)
 
@@ -177,7 +166,5 @@ if retour[0]:
 	try:
 		api.PostUpdate(twitter_status)
 	except Exception, e:
-		printFail("posting to twitter", "api.PostUpdate")
-	#else:
-		#printOk("posting to twitter")
+		syslog.syslog(syslog.LOG_ERR,"posting to twitter: " + e.strerror)
 

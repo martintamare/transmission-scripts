@@ -5,24 +5,19 @@ from tvnamer.utils import (FileParser,EpisodeInfo)
 from tvdb_api import (tvdb_error, tvdb_shownotfound, tvdb_seasonnotfound,
 tvdb_episodenotfound, tvdb_attributenotfound, tvdb_userabort,Tvdb)
 from my_password import p_tvdb
+import syslog
 
+# instance
 tvdb_instance = Tvdb(apikey=p_tvdb.key)
+
+# specify our log file, here local0 !
+syslog.openlog('torrent_seeded.py', 0, syslog.LOG_LOCAL0)
+
+#variables
 tv_dest="/home/torrent/public/tv/"
 file_source="/home/torrent/downloads/completed/"
-
 script_path="/home/torrent/transmission-scripts/"
 
-def printOk(text):
-	os.system(". "+script_path+"bash-beauty.sh; printTask -t -w 50 \""+text+"\";printOk")
-
-def printFail(text,error):
-	os.system(". "+script_path+"bash-beauty.sh; printTask -t -w 50 \""+text+"\";printFail \"" + error + "\"" )
-
-def printWarn(text):
-	os.system(". "+script_path+"bash-beauty.sh; printTask -t -w 50 \""+text+"\";printWarn")
-	
-def printInfo(text):
-	os.system(". "+script_path+"bash-beauty.sh; printTask -t -w 50 \""+text+"\";printInfo")
 
 # Format filename : lowercase and remove spaces " " with dots "."
 def format(filename):
@@ -116,7 +111,7 @@ def sort(filename):
 		try:
 			os.unlink(home_dir+"/"+formatted_filename)
 		except Exception, e:
-			printFail("removing symlink" , "os.unlink failed on " + home_dir + "/" + formatted_filename + ". Error: " + e.strerror)
+			syslog.syslog(syslog.LOG_ERR,"removing symlink" , "os.unlink failed on " + home_dir + "/" + formatted_filename + ". Error: " + e.strerror)
 		#else:
 			#printOk("removing symlink")
 		
@@ -124,7 +119,7 @@ def sort(filename):
 		try:
 			os.rename(filename,home_dir+"/"+formatted_filename)
 		except Exception, e:
-			printFail("removing file" , "os.rename failed on " + filename + " to " + home_dir + "/" + formatted_filename + ". Error: " + e.strerror)
+			syslog.syslog(syslog.LOG_ERR,"removing file" , "os.rename failed on " + filename + " to " + home_dir + "/" + formatted_filename + ". Error: " + e.strerror)
 		#else:
 			#printOk("removing file")
 
