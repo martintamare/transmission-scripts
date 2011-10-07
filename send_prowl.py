@@ -10,7 +10,7 @@ syslog.openlog('prowl', 0, syslog.LOG_LOCAL0)
 
 p = prowlpy.Prowl(p_prowl.key)
 try:
-    p.add('Transmission','Finished download',sys.argv[1], 0, None, None)
+    p.add('Deluge','Finished download',sys.argv[1], 0, None, None)
 except Exception,msg:
     syslog.syslog(syslog.LOG_ERR,'prowl error' + sys.argv[1])
 	

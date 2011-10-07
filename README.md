@@ -6,6 +6,7 @@ Here is a small explanations of all the scripts. I'll try to update them often, 
 Last update:
 ------------
 Change log to handle syslog. The local0 file is used !
+Change script to use deluge. Why deluge ? Cause with flexget, the ratio and sorting can be automated in a better way ...
 
 To do:
 ------------

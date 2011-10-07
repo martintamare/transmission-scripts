@@ -134,7 +134,7 @@ def generateLevel2(watch_folder,xml,debug):
 					
 	# check episode_list with the database
 	# database connection
-	conn = sqlite3.connect('/home/torrent/transmission-scripts/rss.db')
+	conn = sqlite3.connect('/home/torrent/torrent-scripts/rss.db')
 	cursor = conn.cursor()
 	# will hold final info
 	final_list = []
@@ -143,6 +143,8 @@ def generateLevel2(watch_folder,xml,debug):
 		
 	for episode in episode_list:
 		filename = episode[0]
+		if(debug):
+			syslog.syslog(syslog.LOG_DEBUG,"fichier actuel : "+filename)
 		if(InDatabase(filename,cursor)):
 			# If present to extract data
 			(date,info,path) = FetchInfo(filename,cursor)
@@ -200,16 +202,16 @@ def generateLevel2(watch_folder,xml,debug):
 	
 # Return tuple (date,info,path) from database using filename	
 def FetchInfo(filename,cursor):
-	query = "SELECT date, info, path FROM rss_info WHERE filename =\'" + filename + "\'"
-	cursor.execute(query)
+	query = "SELECT date, info, path FROM rss_info WHERE filename =?"
+	cursor.execute(query,[filename])
 	row = cursor.fetchone()
 	# remove unecessary path from full path
 	return row[0],row[1],row[2].replace("/home/torrent/public/tv/","",1)+"/"
 
 # Check in a filename is already in database and return boolean
 def InDatabase(filename,cursor):
-	query = "SELECT COUNT(*) FROM rss_info WHERE filename =\'" + filename + "\'"
-	cursor.execute(query)
+	query = "SELECT COUNT(*) FROM rss_info WHERE filename=?"
+	cursor.execute(query,[filename])
 	(numrows,)=cursor.fetchone()
 	if(numrows == 0):
 		return False

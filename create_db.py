@@ -2,7 +2,7 @@
 import sqlite3
 
 # Connect sqlite
-conn = sqlite3.connect('/home/torrent/transmission-scripts/rss.db')
+conn = sqlite3.connect('/home/torrent/torrent-scripts/rss.db')
 c = conn.cursor()
 
 # Create table

@@ -1,38 +1,20 @@
-#! /usr/bin/env python2.6
-
-import re,os,stat,shutil,string,sys,twitter,tinyurl
+#!/usr/bin/python
+import sys
+import os
+import syslog
+import twitter,tinyurl
+from my_password import (p_tvdb, p_twitter)
 from tvnamer.utils import (FileParser,EpisodeInfo)
 from tvdb_api import (tvdb_error, tvdb_shownotfound, tvdb_seasonnotfound, tvdb_episodenotfound, tvdb_attributenotfound, tvdb_userabort,Tvdb)
-from my_password import (p_tvdb, p_twitter)
-import syslog
 
-# instance
+# tvdb instance
 tvdb_instance = Tvdb(apikey=p_tvdb.key)
 
 # specify our log file, here local0 !
 syslog.openlog('torrent_ended.py', 0, syslog.LOG_LOCAL0)
 
-# different path
-file_source="/home/torrent/downloads/completed/"
-torrent_source="/var/lib/transmission-daemon/info/torrents/"
-tv_dest="/home/torrent/public/tv/"
-other_dest="/home/torrent/private/"
-http_base="https://fi08.us.to/"
-script_path="/home/torrent/transmission-scripts/"
+api = twitter.Api(consumer_key=p_twitter.consumer_key,consumer_secret=p_twitter.consumer_secret, access_token_key=p_twitter.access_token_key, access_token_secret=p_twitter.access_token_secret)
 
-# Format filename : lowercase and remove spaces " " with dots "."
-def format(filename):
-	temp =''
-	for i in filename.split(' '):
-		temp = temp + i.lower() +"."
-	temp = temp.rstrip(".")
-	
-	name=""
-	for i in temp.split('_'):
-		name = name + i.lower() +"."
-	name = name.rstrip(".")
-	return name
-	
 # Parse a string to find a tvshow using tvnamer
 # Return a couple (boolean,episode)
 def tvnamer(filename):
@@ -45,8 +27,7 @@ def tvnamer(filename):
 			return(False,episode)
 		else:
 			return(True,episode)
-
-
+			
 def checkifTV(episode):
 	try:
 		tvdb_instance[episode.seriesname]
@@ -73,7 +54,7 @@ def populateFromTvdb(episode):
 			epnames.append(episodeinfo['episodename'])
 	episode.episodename = epnames
 	return
-	
+
 # Return a string containing episode information
 # Format : ShowName - [01x02] - EpisodeName
 def get_episode_description(episode):
@@ -85,86 +66,24 @@ def get_episode_description(episode):
 		episodename = episode.episodename,
         filename = None)
 	return ep.generateFilename()
-	
 
-# Function that creates a symlink in the right folder for tv show or move directly the file if not
-# Return a couple (boolean,status,http_dir)
-# Status represents the name of the tv shows + episode number + episode name
-# Ex : House - [06x15] - I Love Pills			
-# Http_dir contains the right url for tinyurl
-def sort(filename,id):
-	is_tv = tvnamer(filename)
-	formatted_filename = format(filename)
-	
-	# Return value
-	status = ""
-	http_dir = ""
-	
-	if checkifTV(is_tv[1]):
-		episode = is_tv[1]
-		
-		# Format show name and filename
-		dest_folder = format(episode.seriesname)
-		season = episode.seasonnumber
-		
-		if(season!=0):
-			# Store
-			base_home_dir = tv_dest + dest_folder
-			home_dir = base_home_dir +"/s" + str(season)
-			
-			#printOk("founded : \"" + episode.seriesname + "\"")
-			# Test si le dossier existe
-			if(not(os.path.isdir(base_home_dir))):
-				try:
-					os.mkdir(base_home_dir)
-				except Exception, e:
-					syslog.syslog(syslog.LOG_ERR,"os.mkdir failed on " + base_home_dir + ". Error: " + e.strerror)
-				else:
-					syslog.syslog(syslog.LOG_INFO,"created subdirectory " + dest_folder)
-				
-			if(not(os.path.isdir(home_dir))):
-				try:
-					os.mkdir(home_dir)
-				except Exception, e:
-					syslog.syslog(syslog.LOG_ERR,"os.mkdir failed on " + home_dir + ". Error: " + e.strerror)
-				else:
-					syslog.syslog(syslog.LOG_INFO,"created subdirectory s" + str(season))
-					
-			try:
-				os.symlink(file_source+filename,home_dir+"/"+formatted_filename)
-			except Exception, e:
-				syslog.syslog(syslog.LOG_ERR,"os.symlink failed on " + home_dir + "/"+formatted_filename + ". Error: " + e.strerror)
-			
-			# build the http for twitter status	
-			http_dir = "tv/" + dest_folder +"/s" + str(season) + "/" + formatted_filename
-			
-			# Create status
-			status = get_episode_description(episode)
-			return(True,status,http_dir)
-		else:
-			syslog.syslog(syslog.LOG_ERR,"tv without season" , filename)
+# Get the name
+torrent_name = sys.argv[1]
+save_path = sys.argv[2]
+http_base="https://fi08.us.to/"
 
-	# else: if we did not return yet
-	# Rename file or folder and then remove associated torrent	
-	#printInfo("not TV, moving to temp zone")
-	try:
-		os.rename(file_source+filename,other_dest+formatted_filename)
-	except Exception, e:
-		syslog.syslog(syslog.LOG_ERR,"moving : " + formatted_filename + " os.rename error: " + e.strerror)
-		
-	os.system(script_path+"rm_torrent.sh "+id);
-	return(False,status,http_dir)
-
-# printInfo("starting script torrent_ended.py")
-retour = sort(sys.argv[1],sys.argv[2])
-api = twitter.Api(consumer_key=p_twitter.consumer_key,consumer_secret=p_twitter.consumer_secret, access_token_key=p_twitter.access_token_key, access_token_secret=p_twitter.access_token_secret)
-
-if retour[0]:
-	url = http_base + retour[2]
+# Parse it to see if it's tv
+is_tv = tvnamer(torrent_name)
+if checkifTV(is_tv[1]):
+	episode = is_tv[1]
+	# Format show name and filename /home/torrent/public/tv/
+	sub_path = save_path.replace("/home/torrent/public/","")
+	sub_path = sub_path + "/"
+	url = http_base + sub_path + torrent_name
+	status = get_episode_description(episode)
 	url = tinyurl.create_one(url)
-	twitter_status = retour[1] + " " + url
+	twitter_status = status + " " + url
 	try:
 		api.PostUpdate(twitter_status)
 	except Exception, e:
-		syslog.syslog(syslog.LOG_ERR,"posting to twitter: " + e.strerror)
-
+		syslog.syslog(syslog.LOG_ERR,"posting to twitter: " + e.__str__())
