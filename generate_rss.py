@@ -64,6 +64,7 @@ def generateRSS(debug):
 		syslog.syslog(syslog.LOG_DEBUG,"starting TV RSS generation")
 	generateLevel2("tv","tvshows",debug)
 
+	syslog.syslog(syslog.LOG_INFO, "generation ok")
 
 # Will genarate an rss file in xml, watching files/folder present watch_folder, printing debug info if necessary
 def generateLevel1(watch_folder,xml,debug):
